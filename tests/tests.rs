@@ -10,10 +10,3 @@ fn pass() {
     let result = sjuz::decompress(bytes);
     assert_eq!(result.expect("Should be success").id(), "Test archive");
 }
-
-/*
-#[wasm_bindgen_test]
-fn fail() {
-    assert_eq!(1, 2);
-}
-*/

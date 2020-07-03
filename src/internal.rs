@@ -14,7 +14,7 @@ pub struct InternalArchive {
 
 const SIGNATURE: [u8; 6] = [0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C];
 
-pub fn decompress_internal(data: &[u8]) -> Result<InternalArchive, ArchiveError> {
+pub fn decompress(data: &[u8]) -> Result<InternalArchive, ArchiveError> {
     // log("decompress here from Rust");
     // log(&format!("Length is {}", data.len()));
 
@@ -39,7 +39,7 @@ mod tests {
     #[test]
     fn it_works() {
         let bytes = include_bytes!("../tests/foobar.7z");
-        let result = decompress_internal(bytes);
+        let result = decompress(bytes);
         match result {
             Ok(res) => { assert_eq!(res.id, "Test archive"); }
             Err(e) => { panic!(e); }

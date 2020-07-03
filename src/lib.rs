@@ -26,7 +26,7 @@ impl Archive {
 
 #[wasm_bindgen]
 pub fn decompress(data: &[u8]) -> Result<Archive, JsValue> {
-    let result = internal::decompress_internal(data);
+    let result = internal::decompress(data);
 
     return match result {
         Ok(res) => Ok(Archive{

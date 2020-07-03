@@ -6,13 +6,8 @@ wasm_bindgen_test_configure!(run_in_browser);
 
 #[wasm_bindgen_test]
 fn pass() {
-    let _bytes = std::include_bytes!("foobar.7z");
-    assert_eq!(1, 1);
-}
+    let bytes = include_bytes!("foobar.7z");
 
-/*
-#[wasm_bindgen_test]
-fn fail() {
-    assert_eq!(1, 2);
+    let result = sjuz::decompress(bytes);
+    assert_eq!(result.expect("Should be success").id(), "Test archive");
 }
-*/
