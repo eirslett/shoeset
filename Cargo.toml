@@ -1,0 +1,14 @@
+[package]
+name = "sjuz"
+version = "0.1.0"
+authors = ["Eirik Sletteberg <eirik.sletteberg@nav.no>"]
+license = "MIT"
+description = "A 7z decompression library"
+repository = "unknown"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wasm-bindgen = "0.2"
+wasm-bindgen-test = "0.3"
