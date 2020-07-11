@@ -412,28 +412,6 @@ pub fn read_encoded_header<'a>(buf: &'a mut buffer::Buffer) -> Result<Vec<u8>, A
     decode::decode(&coder.coder_options.decompression_method_id, &reader, &coder.coder_options.properties, unpack_size)
 }
 
-/*
-pub fn decompress_entry(buf: &mut buffer::Buffer, entry: &Entry) -> Result<Vec<u8>, ArchiveError> {
-    println!("Decompressing {:?}", entry);
-    println!("offset = {}, size = {}, len = {}", entry.offset, entry.size, buf.len());
-    buf.seek(entry.offset as usize);
-    let reader = buf.read_multi(entry.size as usize);
-    println!("Encoded: {:?}", reader);
-
-    let coders = &entry.coders;
-    // just a little hack/shortcut; use the first coder
-    let coder = coders[0];
-
-    let unpack_size = entry.size; // TODO: fix
-
-    let res = decode::decode(&coder.decompression_method_id, &reader, &coder.properties, unpack_size)?;
-    println!("Just decoded {} bytes: {:?}", unpack_size, res);
-    let sparkle_heart = std::str::from_utf8(&res).unwrap();
-    println!("Sparkle... \"{}\"", sparkle_heart);
-    Ok(res)
-}
-*/
-
 mod tests {
 
 }

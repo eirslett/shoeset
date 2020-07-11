@@ -36,8 +36,6 @@ impl<'a> Buffer<'a> {
         self.position += length;
         return result;
     }
-
-    pub fn debug_get_pos(&self) -> usize { self.position }
 }
 
 mod tests {

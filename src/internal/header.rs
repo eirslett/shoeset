@@ -58,8 +58,6 @@ pub fn read_header(buf: &mut buffer::Buffer) -> Result<Header, ArchiveError> {
         streams_info
     };
 
-    println!("Header: {:#?}", header);
-
     Ok(header)
 }
 
@@ -77,28 +75,15 @@ pub fn get_stream_offsets(header: &Header) -> Vec<Entry> {
 
     for i in 0..header.files_info.len() {
         let file = &header.files_info[i];
-        println!("Working on file {:?}", file);
         let folder_index = header.stream_map.file_folder_index[i];
-        println!("Folder index {:?}", folder_index);
         match folder_index {
-            None => { println!("It's none, continue!"); continue },
-            /*
-            current_folder_index => {
-                println!("Well should we do anything here, really?");
-                if i > 0 {
-                    // TODO: fix?
-                    // file.content_methods = header.files_info[i - 1].content_methods;
-                }
-            },
-            */
+            None => { continue },
             Some(folder_index) => {
-                println!("Actually do some work");
                 // reopenFolderInputStream
 
                 let uncompressed_size = file.size; // header.streams_info.pack_info.pack_sizes[first_pack_stream_index];
 
                 let offset = offsets_by_folder[folder_index];
-                println!("The offset is {}", offset);
                 // build decode stream something
                 let entry = Entry {
                     // file,
@@ -107,14 +92,11 @@ pub fn get_stream_offsets(header: &Header) -> Vec<Entry> {
                     size: uncompressed_size,
                     folder_index,
                 };
-                println!("Entry: {:?}", entry);
                 offsets.push(entry);
                 offsets_by_folder[folder_index] += uncompressed_size;
-                println!("sizes are now {:?}", offsets_by_folder);
             }
         };
     }
-    println!("All the entries! {:?}", offsets);
     offsets
 }
 
@@ -272,7 +254,6 @@ fn read_files_info(buf: &mut buffer::Buffer, substreams_info: &SubstreamsInfo) -
 
     let mut files: Vec<File> = Vec::with_capacity(num_files as usize);
     loop {
-        println!("Looping, now at {}", buf.debug_get_pos());
         let nid = read_nid(buf)?;
 
         if nid == NID::End {
@@ -283,22 +264,17 @@ fn read_files_info(buf: &mut buffer::Buffer, substreams_info: &SubstreamsInfo) -
         match nid {
             NID::EmptyStream => is_empty_stream = read_utils::read_bits(buf, num_files),
             NID::EmptyFile => {
-                println!("Length of is_empty_stream {}", is_empty_stream.len());
                 is_empty_file = Some(read_utils::read_bits(buf, is_empty_stream.len() as u64));
             },
             NID::Anti => is_anti = read_utils::read_bits(buf, is_empty_stream.len() as u64),
             NID::Name => {
-                println!("NOW READING NAMES? {}", size);
                 skip_external(buf)?;
                 if ((size - 1) & 1) != 0 {
                     return Err(ArchiveError::new("File names length invalid"));
                 }
 
-                println!("Reading names size {}", size - 1);
 
                 let names = buf.read_multi((size - 1) as usize);
-
-                println!("Names are ready {:?}", names);
 
                 let mut next_name_pos = 0;
                 for x in 0..(names.len() / 2) {
@@ -306,9 +282,6 @@ fn read_files_info(buf: &mut buffer::Buffer, substreams_info: &SubstreamsInfo) -
                     if names[i] == 0 && names[i + 1] == 0 {
                         let name_bytes = &names[next_name_pos..i];
                         let name_str = utf16_decode(name_bytes).map_err(|e| ArchiveError::new(&e.to_string()))?;
-                        println!("file names: {:?}", file_names);
-                        println!("i = {}", i);
-                        println!("name = {}", name_str);
                         file_names.push(name_str);
                         next_name_pos = i + 2;
                     }

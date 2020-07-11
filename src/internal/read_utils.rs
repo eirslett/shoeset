@@ -1,7 +1,5 @@
 use internal::buffer;
 
-// use bit_set::BitSet;
-
 pub fn read_uint32(data: &mut buffer::Buffer) -> u32 {
     let bytes = data.read_multi(4);
     let mut result: u32 = 0;

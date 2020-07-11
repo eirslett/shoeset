@@ -58,7 +58,6 @@ pub fn decompress(data: &[u8]) -> Result<Archive, JsValue> {
 
     let files = Array::new();
     for file in res.files {
-        // let data = unsafe { js_sys::Uint8Array::view(&file.data) };
         let buf: &[u8] = &file.data;
         let data = Uint8Array::from(buf);
         let f = File {
@@ -66,26 +65,11 @@ pub fn decompress(data: &[u8]) -> Result<Archive, JsValue> {
             data
         };
 
-        /*
-        let obj = js_sys::Object::new();
-        js_sys::Object::define_property(&obj, &JsValue::from_str("foo"), "bar");
-        */
-
-        // obj.set("name", &JsValue::from_str(&file.name.to_string()));
         files.push(&JsValue::from(f));
     }
-
 
     Ok(Archive{
         id: res.id,
         files,
     })
-
-        /*
-    return match result {
-
-        Err(e) => Err(JsValue::from_str(&e.message))
-    };
-    */
-
 }

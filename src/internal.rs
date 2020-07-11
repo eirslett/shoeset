@@ -90,12 +90,6 @@ pub fn decompress(data: &[u8]) -> Result<InternalArchive, ArchiveError> {
     if nid == NID::Header {
         let header = header::read_header(&mut buf)?;
         return read_archive_contents(header, &mut buf);
-        /*
-        let _header = header::read_header(&mut buf)?;
-        return Ok(InternalArchive{
-            id: String::from("Test archive")
-        });
-        */
     }
 
     return Err(ArchiveError::new(&format!("Unexpected NID {:?}", nid)));
@@ -129,7 +123,6 @@ fn read_archive_contents<'a>(header: Header, buf: &mut buffer::Buffer) -> Result
 
         buf.seek(folder_buf_offset as usize);
         let reader = buf.read_multi(compressed_size as usize);
-        // println!("Encoded: {:?}", reader);
 
         let coders = folder.get_ordered_coders();
         // just a little hack/shortcut; use the first coder
@@ -137,19 +130,9 @@ fn read_archive_contents<'a>(header: Header, buf: &mut buffer::Buffer) -> Result
 
         let unpack_size = folder.unpack_sizes[0]; // .iter().sum();
 
-        println!("Decoding folder {}! Unpack size: {}", folder_index, unpack_size);
-        println!("Folder data: {:?}", folder);
         let res = decode::decode(&coder.decompression_method_id, &reader, &coder.properties, unpack_size)?;
-        println!("Decoded the folder, size = {}", res.len());
-        // println!("Just decoded {} bytes: {:?}", unpack_size, res);
 
         decoded_folders.push(res);
-
-        /*
-        let sparkle_heart = std::str::from_utf8(&res).unwrap();
-        println!("Sparkle... \"{}\"", sparkle_heart);
-        */
-
     }
 
     println!("Decoded all the folders!");
@@ -160,22 +143,12 @@ fn read_archive_contents<'a>(header: Header, buf: &mut buffer::Buffer) -> Result
         println!("Start = {}, Size = {}, End = {}, Available = {}", entry.offset, entry.size, entry.offset + entry.size, buf.len());
         buf.seek(entry.offset as usize);
         let result = buf.read_multi(entry.size as usize);
-        // println!("Decoded {}: {:?}", entry.name, result);
         data.push(File {
             name: entry.name.to_string(),
             data: result
         });
     }
 
-    /*
-    for entry in stream_offsets {
-        encoded_header::decompress_entry(&mut buf, entry);
-    }
-    */
-    /*
-    encoded_header::decompress_entry(buf, &stream_offsets[0])?;
-    encoded_header::decompress_entry(buf, &stream_offsets[1])?;
-*/
     return Ok(InternalArchive{
         id: String::from("Test archive"),
         files: data
