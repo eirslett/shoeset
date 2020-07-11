@@ -10,5 +10,10 @@ repository = "unknown"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+bit-set = "0.5"
+lzma-rs = "0.1.3"
 wasm-bindgen = "0.2"
 wasm-bindgen-test = "0.3"
+byteorder = "1.3.4"
+bytes = "0.5"
+js-sys = "0.3"
