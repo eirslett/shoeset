@@ -1,13 +1,18 @@
 extern crate js_sys;
 extern crate wasm_bindgen_test;
 extern crate sjuz;
+extern crate wasm_bindgen;
 
 use wasm_bindgen_test::*;
 
 #[wasm_bindgen_test]
 fn pass_tests() {
+    use js_sys;
+
     let bytes = include_bytes!("foobar.7z");
 
     let result = sjuz::decompress(bytes).expect("Should be success");
-    assert_eq!(result.id(), "Test archive");
+    let files: js_sys::Array = result.files();
+
+    assert_eq!(files.length(), 2);
 }

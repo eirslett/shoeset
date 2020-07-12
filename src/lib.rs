@@ -35,17 +35,11 @@ impl File {
 
 #[wasm_bindgen]
 pub struct Archive{
-    id: String,
     files: js_sys::Array
 }
 
 #[wasm_bindgen]
 impl Archive {
-    #[wasm_bindgen(getter)]
-    pub fn id(&self) -> String {
-        self.id.clone()
-    }
-
     #[wasm_bindgen(getter)]
     pub fn files(&self) -> js_sys::Array {
         self.files.clone()
@@ -69,7 +63,6 @@ pub fn decompress(data: &[u8]) -> Result<Archive, JsValue> {
     }
 
     Ok(Archive{
-        id: res.id,
         files,
     })
 }

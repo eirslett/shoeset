@@ -14,7 +14,6 @@ impl ArchiveError {
 
 #[derive(Debug)]
 pub struct InternalArchive {
-    pub id: String,
     pub files: Vec<File>,
 }
 
@@ -157,7 +156,6 @@ fn read_archive_contents<'a, R>(header: Header, buf: &mut R) -> Result<InternalA
     }
 
     return Ok(InternalArchive{
-        id: String::from("Test archive"),
         files: data
     });
 }
@@ -195,12 +193,10 @@ mod tests {
     fn it_works() -> Result<(), ArchiveError> {
         let bytes = include_bytes!("../tests/foobar.7z");
         let result = decompress(bytes)?;
-        // println!("Decoded: {:?}", result);
         assert_eq!(result.files[0].name, "foobar/hello.txt");
         assert_eq!(std::str::from_utf8(&result.files[0].data).unwrap(), "catcatcatcat\n");
         assert_eq!(result.files[1].name, "foobar/world.txt");
         assert_eq!(std::str::from_utf8(&result.files[1].data).unwrap(), "dogdogdogdogdog\n");
-        assert_eq!(result.id, "Test archive");
         Ok(())
     }
 }
