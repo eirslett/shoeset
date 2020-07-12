@@ -8,7 +8,7 @@ The code is designed to be portable:
 - Run natively as a binary
 - Run as WebAssembly in a web browser or Node.js
 
-Supported decompression algoritms:
+Supported decompression algorithms:
 - LZMA
 - LZMA2
 
