@@ -1,5 +1,6 @@
 use internal::ArchiveError;
-use internal::buffer;
+use std::io;
+use super::byteorder::{LittleEndian, BigEndian, ReadBytesExt};
 
 #[derive(Debug, PartialEq)]
 pub enum NID {
@@ -31,8 +32,8 @@ pub enum NID {
     Dummy
 }
 
-pub fn read_nid(buf: &mut buffer::Buffer) -> Result<NID, ArchiveError> {
-    let i = buf.read();
+pub fn read_nid<R>(buf: &mut R) -> Result<NID, ArchiveError> where R: io::BufRead {
+    let i = buf.read_u8().unwrap();
     let res = match i {
         0 => Ok(NID::End),
         1 => Ok(NID::Header),
@@ -67,9 +68,11 @@ pub fn read_nid(buf: &mut buffer::Buffer) -> Result<NID, ArchiveError> {
 }
 
 mod tests {
+    use std::io;
+
     #[test]
     fn read_nid_header() -> Result<(), super::ArchiveError> {
-        let mut buff = super::buffer::Buffer::new(&[1]);
+        let mut buff = io::Cursor::new(vec![1]);
         let result = super::read_nid(&mut buff)?;
         assert_eq!(result, super::NID::Header);
         Ok(())
@@ -77,7 +80,7 @@ mod tests {
 
     #[test]
     fn read_unexpected() {
-        let mut buff = super::buffer::Buffer::new(&[250]);
+        let mut buff = io::Cursor::new(vec![250]);
         let result = super::read_nid(&mut buff);
         assert!(result.is_err(), "Should return an error");
         assert_eq!(result.err().unwrap().message, "Unrecognized NID flag 250");

@@ -2,12 +2,13 @@ use internal::{ArchiveError};
 use internal::nid::NID;
 use internal::nid::read_nid;
 use internal::read_utils::read_dyn_uint64 as dyn64;
-use internal::buffer;
 use internal::encoded_header;
 use internal::read_utils;
+use std::io;
 use std::string::FromUtf16Error;
 use internal::encoded_header::StreamsInfo;
 use internal::encoded_header::SubstreamsInfo;
+use super::byteorder::{LittleEndian, BigEndian, ReadBytesExt};
 
 #[derive(Debug)]
 pub struct Header {
@@ -16,7 +17,13 @@ pub struct Header {
     pub stream_map: StreamMap,
 }
 
-pub fn read_header(buf: &mut buffer::Buffer) -> Result<Header, ArchiveError> {
+// TODO: there should exist a method on Read that didn't require an actual read, just to skip bytes
+fn skip<R>(buf: &mut R, length: usize) where R: io::BufRead {
+    let mut ignore = vec![0u8; length];
+    buf.read_exact(&mut ignore);
+}
+
+pub fn read_header<R>(buf: &mut R) -> Result<Header, ArchiveError> where R: io::BufRead {
     let mut nid = read_nid(buf)?;
 
     let mut files_info: Vec<File> = Vec::new();
@@ -167,18 +174,18 @@ fn calculate_stream_map(files: &Vec<File>, streams_info: &StreamsInfo) -> Result
 }
 
 // Looks like these aren't really necessary
-fn skip_archive_properties(buf: &mut buffer::Buffer) -> Result<(), ArchiveError> {
+fn skip_archive_properties<R>(buf: &mut R) -> Result<(), ArchiveError> where R: io::BufRead {
     let mut nid = read_nid(buf)?;
     while nid != NID::End {
         let property_size = dyn64(buf);
-        buf.skip(property_size as usize);
+        skip(buf, property_size as usize);
         nid = read_nid(buf)?;
     }
     Ok(())
 }
 
-fn skip_external(buf: &mut buffer::Buffer) -> Result<(), ArchiveError> {
-    let external = buf.read();
+fn skip_external<R>(buf: &mut R) -> Result<(), ArchiveError> where R: io::BufRead {
+    let external = buf.read_u8().unwrap();
     if external != 0 {
         return Err(ArchiveError::new("External unsupported"));
     }
@@ -199,9 +206,9 @@ fn utf16_decode(data: &[u8]) -> Result<String, FromUtf16Error> {
 
 }
 
-fn read_dates(buf: &mut buffer::Buffer, num_files: u64) -> Result<Vec<Option<u64>>, ArchiveError> {
+fn read_dates<R>(buf: &mut R, num_files: u64) -> Result<Vec<Option<u64>>, ArchiveError> where R: io::BufRead {
     let mut dates: Vec<Option<u64>> = Vec::new();
-    let times_defined = read_utils::read_all_or_bits(buf, num_files);
+    let times_defined = read_utils::read_all_or_bits(buf, num_files as usize);
     skip_external(buf)?;
     for i in 0..num_files {
         dates.push(if times_defined.contains(i as usize) {
@@ -213,9 +220,9 @@ fn read_dates(buf: &mut buffer::Buffer, num_files: u64) -> Result<Vec<Option<u64
     Ok(dates)
 }
 
-fn read_win_attributes(buf: &mut buffer::Buffer, num_files: u64) -> Result<Vec<Option<u32>>, ArchiveError> {
+fn read_win_attributes<R>(buf: &mut R, num_files: u64) -> Result<Vec<Option<u32>>, ArchiveError> where R: io::BufRead {
     let mut attrs: Vec<Option<u32>> = Vec::new();
-    let times_defined = read_utils::read_all_or_bits(buf, num_files);
+    let times_defined = read_utils::read_all_or_bits(buf, num_files as usize);
     skip_external(buf)?;
     for i in 0..num_files {
         attrs.push(if times_defined.contains(i as usize) {
@@ -241,7 +248,7 @@ pub struct File {
     // compressed_size: u64,
 }
 
-fn read_files_info(buf: &mut buffer::Buffer, substreams_info: &SubstreamsInfo) -> Result<Vec<File>, ArchiveError> {
+fn read_files_info<R>(buf: &mut R, substreams_info: &SubstreamsInfo) -> Result<Vec<File>, ArchiveError> where R: io::BufRead {
     let num_files = dyn64(buf);
     let mut is_empty_stream = bit_set::BitSet::with_capacity(num_files as usize);
     let mut is_empty_file = None; // bit_set::BitSet::with_capacity(num_files as usize);
@@ -262,11 +269,11 @@ fn read_files_info(buf: &mut buffer::Buffer, substreams_info: &SubstreamsInfo) -
         let size = dyn64(buf);
 
         match nid {
-            NID::EmptyStream => is_empty_stream = read_utils::read_bits(buf, num_files),
+            NID::EmptyStream => is_empty_stream = read_utils::read_bits(buf, num_files as usize),
             NID::EmptyFile => {
-                is_empty_file = Some(read_utils::read_bits(buf, is_empty_stream.len() as u64));
+                is_empty_file = Some(read_utils::read_bits(buf, is_empty_stream.len()));
             },
-            NID::Anti => is_anti = read_utils::read_bits(buf, is_empty_stream.len() as u64),
+            NID::Anti => is_anti = read_utils::read_bits(buf, is_empty_stream.len()),
             NID::Name => {
                 skip_external(buf)?;
                 if ((size - 1) & 1) != 0 {
@@ -274,7 +281,8 @@ fn read_files_info(buf: &mut buffer::Buffer, substreams_info: &SubstreamsInfo) -
                 }
 
 
-                let names = buf.read_multi((size - 1) as usize);
+                let mut names = vec![0u8; (size - 1) as usize];
+                buf.read_exact(&mut names);
 
                 let mut next_name_pos = 0;
                 for x in 0..(names.len() / 2) {
@@ -307,7 +315,7 @@ fn read_files_info(buf: &mut buffer::Buffer, substreams_info: &SubstreamsInfo) -
                 buf.skip(size);
             }
             */
-            _ => { buf.skip(size as usize); }
+            _ => { skip(buf, size as usize); }
         }
     }
 

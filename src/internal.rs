@@ -1,7 +1,6 @@
 extern crate bit_set;
 extern crate lzma_rs;
 extern crate byteorder;
-extern crate bytes;
 
 #[derive(Debug, Clone)]
 pub struct ArchiveError {
@@ -19,18 +18,21 @@ pub struct InternalArchive {
     pub files: Vec<File>,
 }
 
-const SIGNATURE_HEADER_SIZE: usize = 32;
+const SIGNATURE_HEADER_SIZE: u64 = 32;
 const SIGNATURE: [u8; 6] = [0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C];
 
+use std::io;
+use std::io::Cursor;
+use std::io::Read;
 mod read_utils;
 mod nid;
-mod buffer;
 mod header;
 mod decode;
 mod encoded_header;
 
 use internal::nid::NID;
 use internal::header::Header;
+use self::byteorder::{LittleEndian, BigEndian, ReadBytesExt};
 
 #[derive(Debug)]
 struct StartHeader {
@@ -39,7 +41,7 @@ struct StartHeader {
     next_header_crc: u32
 }
 
-fn read_start_header(buf: &mut buffer::Buffer) -> Result<StartHeader, ArchiveError> {
+fn read_start_header<R>(buf: &mut R) -> Result<StartHeader, ArchiveError> where R: io::BufRead {
     let next_header_offset = read_utils::read_uint64(buf);
     let next_header_size  = read_utils::read_uint64(buf);
     let next_header_crc = read_utils::read_uint32(buf);
@@ -51,7 +53,7 @@ fn read_start_header(buf: &mut buffer::Buffer) -> Result<StartHeader, ArchiveErr
 }
 
 pub fn decompress(data: &[u8]) -> Result<InternalArchive, ArchiveError> {
-    let mut buf = buffer::Buffer::new(data);
+    let mut buf = io::Cursor::new(data);
 
     if data.len() < 12 {
         return Err(ArchiveError::new("The file is too small"));
@@ -68,17 +70,17 @@ pub fn decompress(data: &[u8]) -> Result<InternalArchive, ArchiveError> {
         return Err(ArchiveError::new(&format!("Unsupported 7z version ({},{})", major_version, minor_version)));
     }
 
-    buf.seek(8);
+    buf.set_position(8);
+
     let _start_header_crc = 0xFFFFFFFF & read_utils::read_uint32(&mut buf);
     let start_header = read_start_header(&mut buf)?;
 
-
-    buf.seek(SIGNATURE_HEADER_SIZE + start_header.next_header_offset as usize);
+    buf.set_position(SIGNATURE_HEADER_SIZE + start_header.next_header_offset);
 
     let mut nid = nid::read_nid(&mut buf)?;
     if nid == NID::EncodedHeader {
         let decoded = encoded_header::read_encoded_header(&mut buf)?;
-        let mut header_buf = buffer::Buffer::new(&decoded);
+        let mut header_buf = io::Cursor::new(&decoded);
         nid = nid::read_nid(&mut header_buf)?;
 
         if nid == NID::Header {
@@ -101,7 +103,7 @@ pub struct File {
     pub data: Vec<u8>
 }
 
-fn read_archive_contents<'a>(header: Header, buf: &mut buffer::Buffer) -> Result<InternalArchive, ArchiveError> {
+fn read_archive_contents<'a, R>(header: Header, buf: &mut R) -> Result<InternalArchive, ArchiveError> where R: io::BufRead, R: io::Seek {
     let stream_offsets = header::get_stream_offsets(&header);
     println!("Stream offsets: {:?}", stream_offsets);
 
@@ -121,8 +123,10 @@ fn read_archive_contents<'a>(header: Header, buf: &mut buffer::Buffer) -> Result
 
         let compressed_size = header.streams_info.pack_info.pack_sizes[folder_index];
 
-        buf.seek(folder_buf_offset as usize);
-        let reader = buf.read_multi(compressed_size as usize);
+        buf.seek(io::SeekFrom::Start(folder_buf_offset));
+        // buf.set_position(folder_buf_offset as usize);
+        let mut reader = vec![0u8; compressed_size as usize];
+        buf.read_exact(&mut reader);
 
         let coders = folder.get_ordered_coders();
         // just a little hack/shortcut; use the first coder
@@ -139,10 +143,13 @@ fn read_archive_contents<'a>(header: Header, buf: &mut buffer::Buffer) -> Result
 
     for i in 0..stream_offsets.len() {
         let entry = &stream_offsets[i];
-        let mut buf = buffer::Buffer::new(&decoded_folders[entry.folder_index]);
-        println!("Start = {}, Size = {}, End = {}, Available = {}", entry.offset, entry.size, entry.offset + entry.size, buf.len());
-        buf.seek(entry.offset as usize);
-        let result = buf.read_multi(entry.size as usize);
+        let decoded_folder_data = &decoded_folders[entry.folder_index];
+        let mut buf = io::Cursor::new(decoded_folder_data);
+        // println!("Start = {}, Size = {}, End = {}, Available = {}", entry.offset, entry.size, entry.offset + entry.size, buf.len());
+        buf.set_position(entry.offset);
+        let mut result = vec![0u8; entry.size as usize];
+        // buf.read_u8().unwrap();
+        buf.read_exact(&mut result);
         data.push(File {
             name: entry.name.to_string(),
             data: result

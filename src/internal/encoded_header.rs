@@ -2,10 +2,13 @@ use internal::{ArchiveError, SIGNATURE_HEADER_SIZE};
 use internal::nid::NID;
 use internal::nid::read_nid;
 use internal::read_utils;
-use internal::buffer;
 use internal::read_utils::read_dyn_uint64 as dyn64;
-use std::vec::Vec;
 use internal::decode;
+use std::vec::Vec;
+use std::io;
+use std::io::prelude::*;
+use std::io::Cursor;
+use super::byteorder::{LittleEndian, BigEndian, ReadBytesExt};
 
 #[derive(Debug)]
 pub struct StreamsInfo {
@@ -14,7 +17,7 @@ pub struct StreamsInfo {
     pub folders: Vec<Folder>
 }
 
-pub fn read_streams_info(buf: &mut buffer::Buffer) -> Result<StreamsInfo, ArchiveError> {
+pub fn read_streams_info<R>(buf: &mut R) -> Result<StreamsInfo, ArchiveError> where R: io::BufRead {
     let mut nid = read_nid(buf)?;
 
     let mut pack_info: Option<PackInfo> = None;
@@ -54,7 +57,7 @@ pub struct PackInfo {
     pack_crcs_defined: bit_set::BitSet,
     pack_crcs: Vec<u32>,
 }
-fn read_pack_info(buf: &mut buffer::Buffer) -> Result<PackInfo, ArchiveError> {
+fn read_pack_info<R>(buf: &mut R) -> Result<PackInfo, ArchiveError> where R: io::BufRead {
     let pack_pos = dyn64(buf);
     let num_pack_streams = dyn64(buf);
     let mut nid = read_nid(buf)?;
@@ -70,7 +73,7 @@ fn read_pack_info(buf: &mut buffer::Buffer) -> Result<PackInfo, ArchiveError> {
     let mut pack_crcs_defined = bit_set::BitSet::new();
     let mut pack_crcs: Vec<u32> = Vec::new();
     if nid == NID::Crc {
-        pack_crcs_defined = read_utils::read_all_or_bits(buf, num_pack_streams);
+        pack_crcs_defined = read_utils::read_all_or_bits(buf, num_pack_streams as usize);
         pack_crcs = (0..num_pack_streams)
             .map(|_| read_utils::read_uint32(buf))
             .collect();
@@ -89,13 +92,13 @@ fn read_pack_info(buf: &mut buffer::Buffer) -> Result<PackInfo, ArchiveError> {
     })
 }
 
-fn read_unpack_info(buf: &mut buffer::Buffer) -> Result<Vec<Folder>, ArchiveError> {
+fn read_unpack_info<R>(buf: &mut R) -> Result<Vec<Folder>, ArchiveError> where R: io::BufRead {
     let mut nid = read_nid(buf)?;
     if nid != NID::Folder {
         return Err(ArchiveError::new(&format!("Expected NID Folder, got {:?}", nid)));
     }
     let num_folders = dyn64(buf);
-    let external = buf.read();
+    let external = buf.read_u8().unwrap();
     if external != 0 {
         return Err(ArchiveError::new("External unsupported"));
     }
@@ -119,7 +122,7 @@ fn read_unpack_info(buf: &mut buffer::Buffer) -> Result<Vec<Folder>, ArchiveErro
     nid = read_nid(buf)?;
 
     if nid == NID::Crc {
-        let crcs_defined = read_utils::read_all_or_bits(buf, num_folders);
+        let crcs_defined = read_utils::read_all_or_bits(buf, num_folders as usize);
         for i in 0..num_folders {
             if crcs_defined.contains(i as usize) {
                 folders[i as usize].has_crc = true;
@@ -142,7 +145,7 @@ fn read_unpack_info(buf: &mut buffer::Buffer) -> Result<Vec<Folder>, ArchiveErro
 pub struct SubstreamsInfo {
     pub unpack_sizes: Vec<u64>
 }
-fn read_substreams_info(buf: &mut buffer::Buffer, folders: &mut Vec<Folder>) -> Result<SubstreamsInfo, ArchiveError> {
+fn read_substreams_info<R>(buf: &mut R, folders: &mut Vec<Folder>) -> Result<SubstreamsInfo, ArchiveError> where R: io::BufRead {
     for folder in folders.iter_mut() {
         folder.num_unpack_substreams = 1;
     }
@@ -188,7 +191,7 @@ fn read_substreams_info(buf: &mut buffer::Buffer, folders: &mut Vec<Folder>) -> 
     }
 
     if nid == NID::Crc {
-        let has_missing_crc = read_utils::read_all_or_bits(buf, num_digests);
+        let has_missing_crc = read_utils::read_all_or_bits(buf, num_digests as usize);
         let mut missing_crcs: Vec<u32> = Vec::new();
         for i in 0..num_digests {
             if has_missing_crc.contains(i as usize) {
@@ -295,18 +298,19 @@ fn find_bind_pair_for_out_stream(bind_pairs: &Vec<BindPair>, index: u64) -> Opti
     return None;
 }
 
-fn read_folder(buf: &mut buffer::Buffer) -> Result<Folder, ArchiveError> {
+fn read_folder<R>(buf: &mut R) -> Result<Folder, ArchiveError> where R: io::BufRead {
     let num_coders = dyn64(buf) as usize;
 
     let mut coders: Vec<Coder> = Vec::with_capacity(num_coders);
     for _ in 0..num_coders {
-        let bits = buf.read();
+        let bits = buf.read_u8().unwrap();
         let id_size = bits & 0xf;
         let is_simple = (bits & 0x10) == 0;
         let has_attributes = (bits & 0x20) != 0;
         let more_alternative_methods = (bits & 0x80) != 0;
 
-        let decompression_method_id = buf.read_multi(id_size as usize);
+        let mut decompression_method_id = vec![0; id_size as usize];
+        buf.read_exact(&mut decompression_method_id);
 
         let num_in_streams = if is_simple {
             1
@@ -324,7 +328,9 @@ fn read_folder(buf: &mut buffer::Buffer) -> Result<Folder, ArchiveError> {
 
         if has_attributes {
             let properties_size = dyn64(buf);
-            properties = buf.read_multi(properties_size as usize);
+            properties = vec![0; properties_size as usize];
+            buf.read_exact(&mut properties);
+            // properties = buf.read_multi(properties_size as usize);
         }
 
         if more_alternative_methods {
@@ -395,10 +401,10 @@ fn read_folder(buf: &mut buffer::Buffer) -> Result<Folder, ArchiveError> {
     })
 }
 
-pub fn read_encoded_header<'a>(buf: &'a mut buffer::Buffer) -> Result<Vec<u8>, ArchiveError> {
+pub fn read_encoded_header(buf: &mut io::Cursor<&[u8]>) -> Result<Vec<u8>, ArchiveError> {
     let info = read_streams_info(buf)?;
     let folder = &info.folders[0];
-    let folder_offset = SIGNATURE_HEADER_SIZE + info.pack_info.pack_pos as usize;
+    let folder_offset = SIGNATURE_HEADER_SIZE + info.pack_info.pack_pos;
 
     let unpack_size = folder.get_unpack_size();
 
@@ -407,9 +413,11 @@ pub fn read_encoded_header<'a>(buf: &'a mut buffer::Buffer) -> Result<Vec<u8>, A
     // just a little hack/shortcut; use the first coder
     let coder = coders[0];
 
-    buf.seek(folder_offset);
-    let reader = buf.read_multi(info.pack_info.pack_sizes[0] as usize);
-    decode::decode(&coder.coder_options.decompression_method_id, &reader, &coder.coder_options.properties, unpack_size)
+    buf.set_position(folder_offset);
+
+    let mut out = &mut vec![0u8; info.pack_info.pack_sizes[0] as usize];
+    buf.read_exact(&mut out).map_err(|e| ArchiveError::new(&e.to_string()))?;
+    decode::decode(&coder.coder_options.decompression_method_id, out, &coder.coder_options.properties, unpack_size)
 }
 
 mod tests {
