@@ -71,6 +71,21 @@ fetch('/foobar.7z').then(async response => {
 3) Run `cargo build` to build the native binary, or `./build-npm.sh` to build the npm package
 4) Run `cargo test` to run the unit tests, or `./test.sh` to test the npm package
 
+#### Publishing to NPM
+
+1) `./build-npm.sh`
+2) `cd pkg`
+3) `npm publish --access public`
+
+## Local development setup
+
+1) Run `./build-npm.sh`
+2) `cd pkg`
+3) `npm link`
+4) `cd ../site`
+5) `npm link @eirslett/shoeset`
+6) `node test-nodejs.mjs` to check if the code is working
+
 ## Contributing
 
 Just send me a pull request. I cannot guarantee that I have time to review it, if there are many PRs.
