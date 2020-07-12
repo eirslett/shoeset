@@ -3,7 +3,11 @@ const js = import(`./node_modules/@eirslett/sjuz/sjuz.js`);
 fetch('/vatsim.7z').then(async response => {
     const data = await response.arrayBuffer();
     const mod = await js;
+
+    const before = performance.now();
     const result = mod.decompress(new Uint8Array(data));
+    const after = performance.now();
+    console.log('duration', after - before);
     console.log('got result', result);
     window.result = result;
     console.log('id', result.id);
