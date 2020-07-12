@@ -1,6 +1,6 @@
-const js = import(`./node_modules/@eirslett/sjuz/sjuz.js`);
+const js = import(`./node_modules/@eirslett/shoeset/shoeset.js`);
 
-fetch('/vatsim.7z').then(async response => {
+fetch('/big-test-archive.7z').then(async response => {
     const data = await response.arrayBuffer();
     const mod = await js;
 

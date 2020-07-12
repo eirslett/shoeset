@@ -8,7 +8,11 @@ use std::io;
 use std::string::FromUtf16Error;
 use internal::encoded_header::StreamsInfo;
 use internal::encoded_header::SubstreamsInfo;
-use super::byteorder::{LittleEndian, BigEndian, ReadBytesExt};
+use super::byteorder::ReadBytesExt;
+
+fn or_archive_error<R>(result: Result<R, io::Error>) -> Result<R, ArchiveError> {
+    result.map_err(|e| ArchiveError::new(&e.to_string()))
+}
 
 #[derive(Debug)]
 pub struct Header {
@@ -18,9 +22,9 @@ pub struct Header {
 }
 
 // TODO: there should exist a method on Read that didn't require an actual read, just to skip bytes
-fn skip<R>(buf: &mut R, length: usize) where R: io::BufRead {
+fn skip<R>(buf: &mut R, length: usize) -> Result<(), ArchiveError> where R: io::BufRead {
     let mut ignore = vec![0u8; length];
-    buf.read_exact(&mut ignore);
+    or_archive_error(buf.read_exact(&mut ignore))
 }
 
 pub fn read_header<R>(buf: &mut R) -> Result<Header, ArchiveError> where R: io::BufRead {
@@ -178,7 +182,7 @@ fn skip_archive_properties<R>(buf: &mut R) -> Result<(), ArchiveError> where R: 
     let mut nid = read_nid(buf)?;
     while nid != NID::End {
         let property_size = dyn64(buf);
-        skip(buf, property_size as usize);
+        skip(buf, property_size as usize)?;
         nid = read_nid(buf)?;
     }
     Ok(())
@@ -282,7 +286,7 @@ fn read_files_info<R>(buf: &mut R, substreams_info: &SubstreamsInfo) -> Result<V
 
 
                 let mut names = vec![0u8; (size - 1) as usize];
-                buf.read_exact(&mut names);
+                or_archive_error(buf.read_exact(&mut names))?;
 
                 let mut next_name_pos = 0;
                 for x in 0..(names.len() / 2) {
@@ -315,7 +319,7 @@ fn read_files_info<R>(buf: &mut R, substreams_info: &SubstreamsInfo) -> Result<V
                 buf.skip(size);
             }
             */
-            _ => { skip(buf, size as usize); }
+            _ => { skip(buf, size as usize)?; }
         }
     }
 

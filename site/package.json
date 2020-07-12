@@ -9,7 +9,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@eirslett/sjuz": "0.1.0"
+    "@eirslett/shoeset": "0.1.0"
   },
   "devDependencies": {
     "webpack": "^4.43.0",

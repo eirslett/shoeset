@@ -1,6 +1,6 @@
 use internal::ArchiveError;
 use std::io;
-use super::byteorder::{LittleEndian, BigEndian, ReadBytesExt};
+use super::byteorder::ReadBytesExt;
 
 #[derive(Debug, PartialEq)]
 pub enum NID {
@@ -68,11 +68,9 @@ pub fn read_nid<R>(buf: &mut R) -> Result<NID, ArchiveError> where R: io::BufRea
 }
 
 mod tests {
-    use std::io;
-
     #[test]
     fn read_nid_header() -> Result<(), super::ArchiveError> {
-        let mut buff = io::Cursor::new(vec![1]);
+        let mut buff = std::io::Cursor::new(vec![1]);
         let result = super::read_nid(&mut buff)?;
         assert_eq!(result, super::NID::Header);
         Ok(())
@@ -80,7 +78,7 @@ mod tests {
 
     #[test]
     fn read_unexpected() {
-        let mut buff = io::Cursor::new(vec![250]);
+        let mut buff = std::io::Cursor::new(vec![250]);
         let result = super::read_nid(&mut buff);
         assert!(result.is_err(), "Should return an error");
         assert_eq!(result.err().unwrap().message, "Unrecognized NID flag 250");

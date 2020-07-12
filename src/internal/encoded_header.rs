@@ -7,14 +7,17 @@ use internal::decode;
 use std::vec::Vec;
 use std::io;
 use std::io::prelude::*;
-use std::io::Cursor;
-use super::byteorder::{LittleEndian, BigEndian, ReadBytesExt};
+use super::byteorder::ReadBytesExt;
 
 #[derive(Debug)]
 pub struct StreamsInfo {
     pub pack_info: PackInfo,
     pub substreams_info: Option<SubstreamsInfo>,
     pub folders: Vec<Folder>
+}
+
+fn or_archive_error<R>(result: Result<R, io::Error>) -> Result<R, ArchiveError> {
+    result.map_err(|e| ArchiveError::new(&e.to_string()))
 }
 
 pub fn read_streams_info<R>(buf: &mut R) -> Result<StreamsInfo, ArchiveError> where R: io::BufRead {
@@ -310,7 +313,7 @@ fn read_folder<R>(buf: &mut R) -> Result<Folder, ArchiveError> where R: io::BufR
         let more_alternative_methods = (bits & 0x80) != 0;
 
         let mut decompression_method_id = vec![0; id_size as usize];
-        buf.read_exact(&mut decompression_method_id);
+        or_archive_error(buf.read_exact(&mut decompression_method_id))?;
 
         let num_in_streams = if is_simple {
             1
@@ -329,7 +332,7 @@ fn read_folder<R>(buf: &mut R) -> Result<Folder, ArchiveError> where R: io::BufR
         if has_attributes {
             let properties_size = dyn64(buf);
             properties = vec![0; properties_size as usize];
-            buf.read_exact(&mut properties);
+            or_archive_error(buf.read_exact(&mut properties))?;
             // properties = buf.read_multi(properties_size as usize);
         }
 

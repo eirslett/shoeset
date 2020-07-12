@@ -2,6 +2,10 @@ extern crate bit_set;
 extern crate lzma_rs;
 extern crate byteorder;
 
+fn or_archive_error<R>(result: Result<R, io::Error>) -> Result<R, ArchiveError> {
+    result.map_err(|e| ArchiveError::new(&e.to_string()))
+}
+
 #[derive(Debug, Clone)]
 pub struct ArchiveError {
     pub message: String
@@ -21,7 +25,6 @@ const SIGNATURE_HEADER_SIZE: u64 = 32;
 const SIGNATURE: [u8; 6] = [0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C];
 
 use std::io;
-use std::io::Cursor;
 use std::io::Read;
 mod read_utils;
 mod nid;
@@ -31,7 +34,6 @@ mod encoded_header;
 
 use internal::nid::NID;
 use internal::header::Header;
-use self::byteorder::{LittleEndian, BigEndian, ReadBytesExt};
 
 #[derive(Debug)]
 struct StartHeader {
@@ -122,10 +124,10 @@ fn read_archive_contents<'a, R>(header: Header, buf: &mut R) -> Result<InternalA
 
         let compressed_size = header.streams_info.pack_info.pack_sizes[folder_index];
 
-        buf.seek(io::SeekFrom::Start(folder_buf_offset));
+        or_archive_error(buf.seek(io::SeekFrom::Start(folder_buf_offset)))?;
         // buf.set_position(folder_buf_offset as usize);
         let mut reader = vec![0u8; compressed_size as usize];
-        buf.read_exact(&mut reader);
+        or_archive_error(buf.read_exact(&mut reader))?;
 
         let coders = folder.get_ordered_coders();
         // just a little hack/shortcut; use the first coder
@@ -148,7 +150,7 @@ fn read_archive_contents<'a, R>(header: Header, buf: &mut R) -> Result<InternalA
         buf.set_position(entry.offset);
         let mut result = vec![0u8; entry.size as usize];
         // buf.read_u8().unwrap();
-        buf.read_exact(&mut result);
+        or_archive_error(buf.read_exact(&mut result))?;
         data.push(File {
             name: entry.name.to_string(),
             data: result

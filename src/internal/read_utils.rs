@@ -1,4 +1,4 @@
-use super::byteorder::{LittleEndian, BigEndian, ReadBytesExt};
+use super::byteorder::{LittleEndian, ReadBytesExt};
 use std::io;
 
 
@@ -54,32 +54,31 @@ pub fn read_bits<R>(data: &mut R, size: usize) -> bit_set::BitSet where R: io::B
 }
 
 mod tests_uint32 {
-    use std::io;
 
     #[test]
     fn read_uint32_zero() {
-        let mut buff = io::Cursor::new(vec![0, 0, 0, 0]);
+        let mut buff = std::io::Cursor::new(vec![0, 0, 0, 0]);
         let result = super::read_uint32(&mut buff);
         assert_eq!(result, 0);
     }
 
     #[test]
     fn read_uint32_257() {
-        let mut buff = io::Cursor::new(vec![1, 1, 0, 0]);
+        let mut buff = std::io::Cursor::new(vec![1, 1, 0, 0]);
         let result = super::read_uint32(&mut buff);
         assert_eq!(result, 257);
     }
 
     #[test]
     fn read_uint32_4096() {
-        let mut buff = io::Cursor::new(vec![0, 16, 0, 0]);
+        let mut buff = std::io::Cursor::new(vec![0, 16, 0, 0]);
         let result = super::read_uint32(&mut buff);
         assert_eq!(result, 4096);
     }
 
     #[test]
     fn read_two_numbers() {
-        let mut buff = io::Cursor::new(vec![0, 16, 0, 0, 0, 8, 0, 0]);
+        let mut buff = std::io::Cursor::new(vec![0, 16, 0, 0, 0, 8, 0, 0]);
         let result1 = super::read_uint32(&mut buff);
         let result2 = super::read_uint32(&mut buff);
         assert_eq!(result1, 4096);
@@ -88,54 +87,51 @@ mod tests_uint32 {
 }
 
 mod tests_uint64 {
-    use std::io;
 
     #[test]
     fn read_uint64_zero() {
-        let mut buff = io::Cursor::new(vec![0, 0, 0, 0, 0, 0, 0, 0]);
+        let mut buff = std::io::Cursor::new(vec![0, 0, 0, 0, 0, 0, 0, 0]);
         let result = super::read_uint64(&mut buff);
         assert_eq!(result, 0);
     }
 
     #[test]
     fn read_uint64_257() {
-        let mut buff = io::Cursor::new(vec![1, 2, 3, 4, 200, 201, 202, 203]);
+        let mut buff = std::io::Cursor::new(vec![1, 2, 3, 4, 200, 201, 202, 203]);
         let result = super::read_uint64(&mut buff);
         assert_eq!(result, 14684771395892871681);
     }
 
     #[test]
     fn read_uint64_4096() {
-        let mut buff = io::Cursor::new(vec![0, 16, 0, 0, 0, 0, 0, 0]);
+        let mut buff = std::io::Cursor::new(vec![0, 16, 0, 0, 0, 0, 0, 0]);
         let result = super::read_uint64(&mut buff);
         assert_eq!(result, 4096);
     }
 }
 
 mod tests_dyn_uint64 {
-    use std::io;
 
     #[test]
     fn read_real_uint64_zero() {
-        let mut buff = io::Cursor::new(vec![0]);
+        let mut buff = std::io::Cursor::new(vec![0]);
         let result = super::read_dyn_uint64(&mut buff);
         assert_eq!(result, 0);
     }
 
     #[test]
     fn read_real_uint64_2199140894112() {
-        let mut buff = io::Cursor::new(vec![250, 160, 5, 3, 7, 0, 0, 1, 3]);
+        let mut buff = std::io::Cursor::new(vec![250, 160, 5, 3, 7, 0, 0, 1, 3]);
         let result = super::read_dyn_uint64(&mut buff);
         assert_eq!(result, 2199140894112);
     }
 }
 
 mod tests_read_all_or_bits {
-    use std::io;
 
     #[test]
     fn all_bits_true() {
-        let bitset = super::read_all_or_bits(&mut io::Cursor::new(vec![1, 0]), 3);
+        let bitset = super::read_all_or_bits(&mut std::io::Cursor::new(vec![1, 0]), 3);
         assert!(bitset.contains(0), "All bits should be true");
         assert!(bitset.contains(1), "All bits should be true");
         assert!(bitset.contains(2), "All bits should be true");
@@ -143,7 +139,7 @@ mod tests_read_all_or_bits {
 
     #[test]
     fn read_bits() {
-        let bitset = super::read_all_or_bits(&mut io::Cursor::new(vec![0, 128]), 4);
+        let bitset = super::read_all_or_bits(&mut std::io::Cursor::new(vec![0, 128]), 4);
         let vec = bitset.into_bit_vec();
         assert_eq!(vec[0], true);
         assert_eq!(vec[1], false);
