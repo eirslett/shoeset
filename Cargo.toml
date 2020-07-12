@@ -4,7 +4,7 @@ version = "0.1.0"
 authors = ["Eirik Sletteberg <eirik.sletteberg@nav.no>"]
 license = "MIT"
 description = "A 7z decompression library"
-repository = "unknown"
+repository = "https://github.com/eirslett/shoeset.git"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
